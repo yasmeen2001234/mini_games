@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:mini_game/gameprovider.dart';
+import 'GameProvider.dart';
 import 'package:provider/provider.dart';
 
 class HSLGameScreen extends StatelessWidget {
@@ -106,21 +106,159 @@ class LeaderboardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final game = Provider.of<GameProvider>(context, listen: false);
 
+    return Column(
+      children: [
+        // Current Player Profile
+        Padding(
+          padding: EdgeInsets.all(16),
+          child: Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange, width: 2),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black87, width: 1),
+                  ),
+                  child: Text(
+                    game.playerAvatar,
+                    style: TextStyle(fontSize: 28),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        game.playerName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "Your Score",
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                StreamBuilder<QuerySnapshot>(
+                  stream: game.leaderboardStream,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return Text("0");
+
+                    int playerScore = 0;
+                    try {
+                      var playerDoc = snapshot.data!.docs.firstWhere(
+                        (doc) => doc.id == game.userId,
+                      );
+                      playerScore = playerDoc['score'] ?? 0;
+                    } catch (e) {
+                      playerScore = 0;
+                    }
+
+                    return Text(
+                      "$playerScore",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        Divider(),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text(
+            "Top Players",
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+        ),
+        Expanded(child: LeaderboardList()),
+      ],
+    );
+  }
+}
+
+class LeaderboardList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final game = Provider.of<GameProvider>(context, listen: false);
+
     return StreamBuilder<QuerySnapshot>(
       stream: game.leaderboardStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (snapshot.hasError) {
+          print('❌ Leaderboard error: ${snapshot.error}');
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'Error: ${snapshot.error}',
+                style: TextStyle(color: Colors.red, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⏳ Leaderboard loading...');
           return Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          print('⚠️ No players found in leaderboard');
+          return Center(
+            child: Text(
+              'No players yet',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+            ),
+          );
+        }
+
+        print(
+          '✅ Leaderboard updated with ${snapshot.data!.docs.length} players',
+        );
+        for (var doc in snapshot.data!.docs) {
+          print('   - ${doc['name']}: ${doc['score']} pts');
+        }
 
         return ListView.builder(
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var data = snapshot.data!.docs[index];
+            String avatar = data['avatar'] ?? '🧐';
             return ListTile(
-              leading: CircleAvatar(child: Text("${index + 1}")),
-              title: Text(data['name']),
+              leading: Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black87, width: 1),
+                ),
+                child: Text(avatar, style: TextStyle(fontSize: 20)),
+              ),
+              title: Text(data['name'] ?? 'Unknown'),
               trailing: Text(
-                "${data['score']}",
+                "${data['score'] ?? 0}",
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             );

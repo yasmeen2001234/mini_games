@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'user_config_provider.dart'; // Import the provider above
+import 'GameProvider.dart';
+import 'SetupScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,8 +24,14 @@ void main() async {
   );
 
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => GameProvider(),
+    MultiProvider(
+      // Change to MultiProvider
+      providers: [
+        ChangeNotifierProvider(
+          create: (context) => UserConfigProvider(),
+        ), // New Provider
+        ChangeNotifierProvider(create: (context) => GameProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -40,58 +49,9 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blueGrey),
       ),
-      home: const HSLGameScreen(),
+      home: SetupScreen(),
     );
   }
-}
-
-// --- GAME LOGIC (PROVIDER) ---
-class GameProvider extends ChangeNotifier {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final String roomId = "global_room";
-  final String userId = "user_${Random().nextInt(1000)}";
-
-  HSLColor baseColor = const HSLColor.fromAHSL(1.0, 200, 0.5, 0.5);
-  int correctIndex = 0;
-
-  GameProvider() {
-    _generateNewRound();
-  }
-
-  void _generateNewRound() {
-    final random = Random();
-    baseColor = HSLColor.fromAHSL(
-      1.0,
-      random.nextDouble() * 360, // Random Hue
-      0.5, // Consistent Saturation
-      0.4 + random.nextDouble() * 0.2, // Random Lightness
-    );
-    correctIndex = random.nextInt(6);
-    notifyListeners();
-  }
-
-  Future<void> handleTap(int index) async {
-    if (index == correctIndex) {
-      _generateNewRound();
-      // Sync score to Firebase
-      await _firestore
-          .collection('rooms')
-          .doc(roomId)
-          .collection('players')
-          .doc(userId)
-          .set({
-            'name': 'Player $userId',
-            'score': FieldValue.increment(5),
-          }, SetOptions(merge: true));
-    }
-  }
-
-  Stream<QuerySnapshot> get leaderboardStream => _firestore
-      .collection('rooms')
-      .doc(roomId)
-      .collection('players')
-      .orderBy('score', descending: true)
-      .snapshots();
 }
 
 // --- UI COMPONENTS ---

@@ -6,14 +6,51 @@ class GameProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final String roomId = "global_room"; // Simplified for this example
   final String userId =
-      "user_${Random().nextInt(1000)}"; // Unique ID for session
+      "user_${DateTime.now().millisecondsSinceEpoch}_${Random().nextInt(100000)}"; // Unique ID for session
 
+  String playerName = "Player"; // Will be set from SetupScreen
+  String playerAvatar = "🧐"; // Will be set from SetupScreen
   HSLColor baseColor = HSLColor.fromAHSL(1.0, 200, 0.5, 0.5);
   int correctIndex = 0;
   double difficulty = 0.1; // Difference in lightness
 
   GameProvider() {
+    print('🆕 GameProvider created with userId: $userId');
     _generateNewRound();
+  }
+
+  void setPlayerName(String name) {
+    playerName = name.isNotEmpty ? name : "Player";
+    notifyListeners();
+  }
+
+  void setPlayerAvatar(String avatar) {
+    playerAvatar = avatar;
+    notifyListeners();
+    // Initialize player document in Firestore
+    _initializePlayerDocument();
+  }
+
+  Future<void> _initializePlayerDocument() async {
+    try {
+      print(
+        '🎮 Initializing player: $userId, name: $playerName, avatar: $playerAvatar',
+      );
+      await _firestore
+          .collection('rooms')
+          .doc(roomId)
+          .collection('players')
+          .doc(userId)
+          .set({
+            'name': playerName,
+            'avatar': playerAvatar,
+            'score': 0,
+            'lastSeen': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      print('✅ Player initialized successfully');
+    } catch (e) {
+      print('❌ Error initializing player document: $e');
+    }
   }
 
   void _generateNewRound() {
@@ -40,17 +77,21 @@ class GameProvider extends ChangeNotifier {
           .collection('players')
           .doc(userId)
           .set({
-            'name': 'Player $userId',
+            'name': playerName,
+            'avatar': playerAvatar,
             'score': FieldValue.increment(5),
             'lastSeen': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     }
   }
 
-  Stream<QuerySnapshot> get leaderboardStream => _firestore
-      .collection('rooms')
-      .doc(roomId)
-      .collection('players')
-      .orderBy('score', descending: true)
-      .snapshots();
+  Stream<QuerySnapshot> get leaderboardStream {
+    print('📊 Leaderboard stream requested from room: $roomId');
+    return _firestore
+        .collection('rooms')
+        .doc(roomId)
+        .collection('players')
+        .orderBy('score', descending: true)
+        .snapshots();
+  }
 }
