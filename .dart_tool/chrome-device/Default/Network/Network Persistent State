@@ -1,0 +1,1 @@
+{"net":{"http_server_properties":{"servers":[{"anonymization":["FAAAABAAAABodHRwOi8vbG9jYWxob3N0",false,0],"network_stats":{"srtt":11507},"server":"https://firestore.googleapis.com"}],"version":5},"network_qualities":{}}}
